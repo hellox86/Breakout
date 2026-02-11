@@ -1,7 +1,0 @@
-C:\breakout\Breakout\Breakout\bin\Debug\Breakout.exe.config
-C:\breakout\Breakout\Breakout\bin\Debug\Breakout.exe
-C:\breakout\Breakout\Breakout\bin\Debug\Breakout.pdb
-C:\breakout\Breakout\Breakout\obj\Debug\Breakout.csproj.AssemblyReference.cache
-C:\breakout\Breakout\Breakout\obj\Debug\Breakout.csproj.CoreCompileInputs.cache
-C:\breakout\Breakout\Breakout\obj\Debug\Breakout.exe
-C:\breakout\Breakout\Breakout\obj\Debug\Breakout.pdb
