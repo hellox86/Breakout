@@ -1,47 +1,41 @@
 ﻿#include <windows.h>
-const int scrWidth = GetSystemMetrics(SM_CXSCREEN);
-const int scrHeight = GetSystemMetrics(SM_CYSCREEN);
+#include "../header/resource.h"
 
-const int wWidth = 800;
-const int wHeight = 600;
+#define SCREEN_WIDTH GetSystemMetrics(SM_CXSCREEN)
+#define SCREEN_HEIGHT GetSystemMetrics(SM_CYSCREEN)
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow)
 {
+    const wchar_t CLASS_NAME[] = L"Breakout game"; // wchar_t нужен для UTF-16 в WinAPI
 
-    // Register the window class.
-    const wchar_t CLASS_NAME[] = L"Breakout game";
-
-    WNDCLASS wc = { };
+    WNDCLASSEX wc = { sizeof(WNDCLASSEX) };
 
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
-
-    RegisterClass(&wc);
-
-    // Create the window.
-
+    wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+    wc.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    RegisterClassEx(&wc);
+   
     HWND hwnd = CreateWindowEx(
-        0,                              // Optional window styles.
-        CLASS_NAME,                     // Window class
-        L"Breakout game",    // Window text
-        WS_OVERLAPPEDWINDOW,            // Window style
-
-        // Size and position
-        (scrWidth - wWidth) / 2, (scrHeight - wHeight) / 2, wWidth, wHeight,
-
-        NULL,       // Parent window    
-        NULL,       // Menu
-        hInstance,  // Instance handle
-        NULL        // Additional application data
+        0,                    
+        CLASS_NAME,
+        L"Breakout game",    
+        WS_OVERLAPPED | WS_SYSMENU | WS_MINIMIZEBOX,
+        (SCREEN_WIDTH - WINDOW_WIDTH) / 2, (SCREEN_HEIGHT - WINDOW_HEIGHT) / 2, WINDOW_WIDTH, WINDOW_HEIGHT,
+        NULL,           
+        NULL,       
+        hInstance,  
+        NULL        
     );
 
-    if (hwnd == NULL)
-    {
-        return 0;
-    }
-
+    if (!hwnd) return 0;
+   
     ShowWindow(hwnd, nCmdShow);
 
     // Run the message loop.
@@ -73,7 +67,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         const int len = lstrlen(text);
         GetClientRect(hwnd, &textArea);
         DrawText(hdc, text, len, &textArea, DT_CENTER | DT_VCENTER);
-
         EndPaint(hwnd, &ps);
     }
     return 0;
