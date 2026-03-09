@@ -1,7 +1,7 @@
 ﻿#include <windows.h>
 #include <windowsx.h>
 #include <iostream>
-
+// 767
 #include "../header/resource.h"
 #define SCREEN_WIDTH GetSystemMetrics(SM_CXSCREEN)
 #define SCREEN_HEIGHT GetSystemMetrics(SM_CYSCREEN)
