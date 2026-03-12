@@ -1,7 +1,6 @@
 ﻿#include <windows.h>
 #include <windowsx.h>
 #include <iostream>
-// 767
 #include "../header/resource.h"
 #define SCREEN_WIDTH GetSystemMetrics(SM_CXSCREEN)
 #define SCREEN_HEIGHT GetSystemMetrics(SM_CYSCREEN)
@@ -14,14 +13,10 @@
 
 static HWND hwnd;
 
-typedef struct {
-    int x, y;    
-} Point;
-
 class Entity {
     public:	
-	Point pos = {0, 0};
-	virtual void draw(HDC hdc) = 0;
+	POINT pos = {0, 0};
+	virtual void draw() = 0;
 };
     
 void DrawRect(HDC hdc, RECT src, COLORREF color) {
@@ -29,44 +24,51 @@ void DrawRect(HDC hdc, RECT src, COLORREF color) {
     HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, brush);
 
     FillRect(hdc, &src, brush);
-
+    ReleaseDC(NULL, hdc);
     SelectObject(hdc, oldBrush);
     DeleteObject(brush);
 }
-POINT mouseStartMove;
 
 class Platform : public Entity {
+    RECT src = {0, 0, 0, 0};
+    COLORREF color;
     public:
-	RECT pl;
-	Platform(int x, int y) {
-            this->pos.x = x;
+	Platform(){};
+	Platform(int x, int y, COLORREF color){
+	    this->pos.x = x;
 	    this->pos.y = y;
+	    this->color = color;
+	};
+	~Platform(){};    
+	void draw() override {
+	    HDC hdc = GetDC(hwnd);
+	    src.left = this->pos.x;
+	    src.top = this->pos.y;
+	    src.right = this->pos.x + PLATFORM_WIDTH - 1;
+	    src.bottom = this->pos.y + PLATFORM_HEIGHT - 1;
+	    DrawRect(hdc, this->src, this->color); 
 	}
-	void draw(HDC hdc) override {
-	    this->pl.left = this->pos.x;
-	    this->pl.right = this->pos.x+PLATFORM_WIDTH-1;
-	    this->pl.top = this->pos.y;
-	    this->pl.bottom = this->pos.y+PLATFORM_HEIGHT-1;
-	     
-	    DrawRect(hdc, this->pl, RGB(170, 170, 170));
-	}	
+	void move() {
+	    
+	}
 };
 class Ball : public Entity {
     public:
-	void draw(HDC hdc) override {
-
+	void draw() override {
+	    
 	}
 };
    
-Platform platform(0, 0);
+Platform platform(0, 0, RGB(37, 150, 190));
 
-void initGame(void) {
+void init(void) {
+    ShowCursor(FALSE);
+    
     RECT client;
     GetClientRect(hwnd, &client);
-    mouseStartMove.x = platform.pos.x = (client.right-client.left)/2 - PLATFORM_WIDTH/2;
-    mouseStartMove.y = platform.pos.y = (client.bottom-client.top)/2 - PLATFORM_HEIGHT/2 + 200;     
+    platform.pos.x = (client.right-client.left)/2 - PLATFORM_WIDTH/2;
+    platform.pos.y = (client.bottom-client.top)/2 - PLATFORM_HEIGHT/2 + 200;     
 }
-BOOL bIsDragging = FALSE;
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -99,14 +101,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
         (SCREEN_WIDTH - WINDOW_WIDTH) / 2, (SCREEN_HEIGHT - WINDOW_HEIGHT) / 2, WINDOW_WIDTH, WINDOW_HEIGHT,
         NULL, NULL, hInstance, NULL);
-    ShowCursor(FALSE);
+
     if (hwnd == NULL)
     {
         MessageBoxA(NULL, "Window Creation Failed!", "Error!",
             MB_ICONEXCLAMATION | MB_OK);
         return 0;
     }
-    initGame();
+    init();
 		
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
@@ -130,57 +132,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		HDC hdc;
 		PAINTSTRUCT  ps;
 		hdc = BeginPaint(hwnd, &ps);
-		platform.draw(hdc);
-		char buf[256];
-		snprintf(buf, sizeof(buf), "x: %d, y: %d\n", platform.pos.x, platform.pos.y);
-		
-		OutputDebugStringA(buf);
-		  
+		platform.draw();
 		EndPaint(hwnd, &ps);   	 
 	    }
 	    break;
- 	case WM_LBUTTONDOWN:
-	    {
-		int xPos = GET_X_LPARAM(lParam);
-		int yPos = GET_Y_LPARAM(lParam);
-		POINT pt = { xPos, yPos };
-
-		if (PtInRect(&platform.pl, pt))
-		{
-		    bIsDragging = TRUE;
-		    SetCapture(hwnd);
-		    mouseStartMove = pt;
-		}
-	    }
-	    break;
- 
-	case WM_MOUSEMOVE:
-	    {
-		int xPos = GET_X_LPARAM(lParam);
-		int yPos = GET_Y_LPARAM(lParam);
-		int dx = xPos-mouseStartMove.x;
-		int dy = yPos-mouseStartMove.y;
-		OffsetRect(&platform.pl, dx, mouseStartMove.y);
-
-		platform.pos.x = xPos;
- 
-		mouseStartMove.x = xPos;
-		mouseStartMove.y = yPos;
-
-		InvalidateRect(hwnd, NULL, TRUE);
-		
-	    }
-	    break;
-	case WM_LBUTTONUP:
-	    {
-		if (bIsDragging)
-		{
-		    bIsDragging = FALSE;
-		    ReleaseCapture();
-		}
-	    }
-	    break;
- 
 	case WM_CLOSE:
             DestroyWindow(hwnd);
             break;
