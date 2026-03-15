@@ -2,16 +2,23 @@
 #include <windowsx.h>
 #include <iostream>
 #include "../header/resource.h"
+
 #define SCREEN_WIDTH GetSystemMetrics(SM_CXSCREEN)
 #define SCREEN_HEIGHT GetSystemMetrics(SM_CYSCREEN)
 
-#define WINDOW_WIDTH 1200
+#define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 
-#define PLATFORM_WIDTH 100
-#define PLATFORM_HEIGHT 4
+#define PLATFORM_WIDTH 80
+#define PLATFORM_HEIGHT 13
+#define PLATFORM_SPEED 50
+
+#define BALL_WIDTH 10
+#define BALL_HEIGHT 10
 
 static HWND hwnd;
+bool Running;
+RECT client;
 
 class Entity {
     public:	
@@ -22,17 +29,16 @@ class Entity {
 void DrawRect(HDC hdc, RECT src, COLORREF color) {
     HBRUSH brush = CreateSolidBrush(color);
     HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, brush);
-
     FillRect(hdc, &src, brush);
     ReleaseDC(NULL, hdc);
     SelectObject(hdc, oldBrush);
     DeleteObject(brush);
 }
-
+ 
 class Platform : public Entity {
-    RECT src = {0, 0, 0, 0};
     COLORREF color;
     public:
+	RECT src = {0, 0, 0, 0};
 	Platform(){};
 	Platform(int x, int y, COLORREF color){
 	    this->pos.x = x;
@@ -40,34 +46,84 @@ class Platform : public Entity {
 	    this->color = color;
 	};
 	~Platform(){};    
-	void draw() override {
-	    HDC hdc = GetDC(hwnd);
+	virtual void draw() override {
+	    HDC hdc = GetDC(hwnd);    
 	    src.left = this->pos.x;
 	    src.top = this->pos.y;
 	    src.right = this->pos.x + PLATFORM_WIDTH - 1;
 	    src.bottom = this->pos.y + PLATFORM_HEIGHT - 1;
-	    DrawRect(hdc, this->src, this->color); 
-	}
-	void move() {
-	    
+	    DrawRect(hdc, this->src, this->color);    
+	} 
+	virtual void update() {	    
+	    GetClientRect(hwnd, &client);	    
+	    if (GetAsyncKeyState(VK_LEFT) & 0x8000) {
+		if (this->pos.x <= client.left) return;
+		this->pos.x -= PLATFORM_SPEED;
+		OffsetRect(&this->src, -PLATFORM_SPEED, 0);
+		InvalidateRect(hwnd, NULL, TRUE);
+	    } else if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
+		if (this->pos.x >= client.right-PLATFORM_WIDTH) return;	  
+		this->pos.x += PLATFORM_SPEED;
+		OffsetRect(&this->src, PLATFORM_SPEED, 0);
+		InvalidateRect(hwnd, NULL, TRUE);		
+	    }
+	    Sleep(100);
 	}
 };
-class Ball : public Entity {
+class Ball : public Platform {
+    COLORREF color;    
     public:
-	void draw() override {
-	    
+	int dx, dy = 0;
+	
+	Ball(){};
+	Ball(int x, int y, COLORREF color) {
+	    this->pos.x = x;
+	    this->pos.y = y;
+	    this->color = color;
 	}
+    	void draw() override {
+	    HDC hdc = GetDC(hwnd);    
+	    src.left = this->pos.x;
+	    src.top = this->pos.y;
+	    src.right = this->pos.x + BALL_WIDTH - 1;
+	    src.bottom = this->pos.y + BALL_HEIGHT - 1;
+	    DrawRect(hdc, this->src, this->color);   
+	}
+	void update() override {
+	    if (this->pos.x <= 0 || this->pos.x >= client.right-BALL_WIDTH) {
+		this->dx *= -1;
+	    }
+	    if (this->pos.y <= 0 || this->pos.y >= client.bottom - BALL_HEIGHT) {
+		this->dy*=-1;
+	    }
+	    this->pos.x += this->dx;
+	    this->pos.y += this->dy;
+	    OffsetRect(&this->src, this->pos.x*this->dx, this->pos.y*this->dy);
+	    InvalidateRect(hwnd, NULL, TRUE);
+	}    
 };
    
-Platform platform(0, 0, RGB(37, 150, 190));
+Platform platform(0, 0, RGB(170, 0, 170));
+Ball ball(0, 0, RGB(255, 255, 255));
 
 void init(void) {
     ShowCursor(FALSE);
-    
-    RECT client;
+    Running = true; 
     GetClientRect(hwnd, &client);
     platform.pos.x = (client.right-client.left)/2 - PLATFORM_WIDTH/2;
-    platform.pos.y = (client.bottom-client.top)/2 - PLATFORM_HEIGHT/2 + 200;     
+    platform.pos.y = (client.bottom-client.top)/2 - PLATFORM_HEIGHT/2 + 260;     
+    ball.pos.x = (client.right-client.left)/2 - BALL_WIDTH/2;
+    ball.pos.y = (client.bottom-client.top)/2 - BALL_HEIGHT/2 + 240;    
+    ball.dx = 25;
+    ball.dy = 25;
+}
+void draw() {
+    platform.draw();
+    ball.draw();
+}
+void update() {
+    platform.update();
+    ball.update();
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -114,12 +170,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     UpdateWindow(hwnd);
     
     MSG Msg;	
-    while (GetMessage(&Msg, NULL, 0, 0))
-    {
-        TranslateMessage(&Msg);
-        DispatchMessage(&Msg);
-    } 
-    
+        while(Running)
+        {
+	    if(PeekMessage(&Msg, 0, 0, 0, PM_REMOVE))
+            {
+                if(Msg.message == WM_QUIT) {
+                    Running = false;
+                }
+                TranslateMessage(&Msg);
+                DispatchMessageA(&Msg);
+            } else {
+          	update();
+		draw();
+	    }
+	}
     return Msg.wParam;
 }
 
@@ -132,14 +196,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		HDC hdc;
 		PAINTSTRUCT  ps;
 		hdc = BeginPaint(hwnd, &ps);
-		platform.draw();
+		draw(); 	 
 		EndPaint(hwnd, &ps);   	 
 	    }
-	    break;
+	    break;      
 	case WM_CLOSE:
+	    Running = false;
             DestroyWindow(hwnd);
             break;
 	case WM_DESTROY:
+	    Running = false;
             PostQuitMessage(0);
             break;
 	default:
