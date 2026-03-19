@@ -21,9 +21,13 @@ bool Running;
 RECT client;
 
 class Entity {
+    protected:
+	    COLORREF color;
     public:	
+	RECT src = {0, 0, 0, 0};
 	POINT pos = {0, 0};
 	virtual void draw() = 0;
+	virtual void update() = 0;
 };
     
 void DrawRect(HDC hdc, RECT src, COLORREF color) {
@@ -36,9 +40,7 @@ void DrawRect(HDC hdc, RECT src, COLORREF color) {
 }
  
 class Platform : public Entity {
-    COLORREF color;
     public:
-	RECT src = {0, 0, 0, 0};
 	Platform(){};
 	Platform(int x, int y, COLORREF color){
 	    this->pos.x = x;
@@ -46,7 +48,7 @@ class Platform : public Entity {
 	    this->color = color;
 	};
 	~Platform(){};    
-	virtual void draw() override {
+	void draw() override {
 	    HDC hdc = GetDC(hwnd);    
 	    src.left = this->pos.x;
 	    src.top = this->pos.y;
@@ -54,13 +56,14 @@ class Platform : public Entity {
 	    src.bottom = this->pos.y + PLATFORM_HEIGHT - 1;
 	    DrawRect(hdc, this->src, this->color);    
 	} 
-	virtual void update() {	    
+	void update() override {	    
 	    GetClientRect(hwnd, &client);	    
 	    if (GetAsyncKeyState(VK_LEFT) & 0x8000) {
 		if (this->pos.x <= client.left) return;
 		this->pos.x -= PLATFORM_SPEED;
 		OffsetRect(&this->src, -PLATFORM_SPEED, 0);
 		InvalidateRect(hwnd, NULL, TRUE);
+
 	    } else if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
 		if (this->pos.x >= client.right-PLATFORM_WIDTH) return;	  
 		this->pos.x += PLATFORM_SPEED;
@@ -70,11 +73,9 @@ class Platform : public Entity {
 	    Sleep(100);
 	}
 };
-class Ball : public Platform {
-    COLORREF color;    
+class Ball : public Entity {    
     public:
-	int dx, dy = 0;
-	
+	int dx, dy = 0;	
 	Ball(){};
 	Ball(int x, int y, COLORREF color) {
 	    this->pos.x = x;
