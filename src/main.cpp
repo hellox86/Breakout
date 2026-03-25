@@ -1,7 +1,9 @@
 ﻿#include <windows.h>
 #include <windowsx.h>
 #include <iostream>
+
 #include "../header/resource.h"
+#include "../header/levels.h"
 
 #define SCREEN_WIDTH GetSystemMetrics(SM_CXSCREEN)
 #define SCREEN_HEIGHT GetSystemMetrics(SM_CYSCREEN)
@@ -16,6 +18,9 @@
 #define BALL_WIDTH 10
 #define BALL_HEIGHT 10
 
+#define TILE_WIDTH 800/13
+#define TILE_HEIGHT 18
+
 static HWND hwnd;
 bool Running;
 RECT client;
@@ -27,7 +32,7 @@ class Entity {
 	RECT src = {0, 0, 0, 0};
 	POINT pos = {0, 0};
 	virtual void draw() = 0;
-	virtual void update() = 0;
+	virtual void update() {};
 };
     
 void DrawRect(HDC hdc, RECT src, COLORREF color) {
@@ -59,18 +64,25 @@ class Platform : public Entity {
 	void update() override {	    
 	    GetClientRect(hwnd, &client);	    
 	    if (GetAsyncKeyState(VK_LEFT) & 0x8000) {
-		if (this->pos.x <= client.left) return;
-		this->pos.x -= PLATFORM_SPEED;
-		OffsetRect(&this->src, -PLATFORM_SPEED, 0);
-		InvalidateRect(hwnd, NULL, TRUE);
-
+		if (this->pos.x <= client.left) {
+		    OffsetRect(&this->src, 0, 0);
+		    InvalidateRect(hwnd, NULL, TRUE);
+		} else {
+		    this->pos.x -= PLATFORM_SPEED;
+		    OffsetRect(&this->src, -PLATFORM_SPEED, 0);
+		    InvalidateRect(hwnd, NULL, TRUE);
+		}
 	    } else if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
-		if (this->pos.x >= client.right-PLATFORM_WIDTH) return;	  
-		this->pos.x += PLATFORM_SPEED;
-		OffsetRect(&this->src, PLATFORM_SPEED, 0);
-		InvalidateRect(hwnd, NULL, TRUE);		
+		if (this->pos.x >= client.right-PLATFORM_WIDTH) {
+		    OffsetRect(&this->src, 0, 0);
+		    InvalidateRect(hwnd, NULL, TRUE);		    
+		} else {
+		    this->pos.x += PLATFORM_SPEED;
+		    OffsetRect(&this->src, PLATFORM_SPEED, 0);
+		    InvalidateRect(hwnd, NULL, TRUE);		
+		}
 	    }
-	    Sleep(100);
+	    Sleep(60);
 	}
 };
 class Ball : public Entity {    
@@ -103,9 +115,49 @@ class Ball : public Entity {
 	    InvalidateRect(hwnd, NULL, TRUE);
 	}    
 };
-   
+
+class Tile : public Entity{
+    public:
+	void draw() override {
+	    HDC hdc = GetDC(hwnd);    
+	    this->src.left = this->pos.x;
+	    this->src.top = this->pos.y;
+	    this->src.right = this->pos.x + TILE_WIDTH - 1;
+	    this->src.bottom = this->pos.y + TILE_HEIGHT - 1;
+	    DrawRect(hdc, this->src, RGB(255, 255, 255));   
+	}
+};
+
+class Grid {
+    Tile grid[8][13];
+    int ox = 2;
+    int oy = 2;
+    public:
+	Grid() {
+	    int i, j;
+	    
+	    for (i = 0; i < 8; i++) {
+		for ( j = 0; j < 13; j++) {
+		    grid[i][j].pos.x = (TILE_WIDTH+ox)*j;
+		    grid[i][j].pos.y = (TILE_HEIGHT+oy)*i;
+		}
+				    
+	    }
+	}
+	void draw() {
+	    for (int i = 0; i < 8; i++) {
+		for (int j = 0; j < 13; j++) {
+		    grid[i][j].draw();
+		}
+	    }
+	    
+	}
+};
+    
 Platform platform(0, 0, RGB(170, 0, 170));
 Ball ball(0, 0, RGB(255, 255, 255));
+Grid grid;
+
 
 void init(void) {
     ShowCursor(FALSE);
@@ -117,8 +169,10 @@ void init(void) {
     ball.pos.y = (client.bottom-client.top)/2 - BALL_HEIGHT/2 + 240;    
     ball.dx = 25;
     ball.dy = 25;
+    
 }
 void draw() {
+    grid.draw();
     platform.draw();
     ball.draw();
 }
