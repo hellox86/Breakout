@@ -8,24 +8,39 @@
 #define SCREEN_WIDTH GetSystemMetrics(SM_CXSCREEN)
 #define SCREEN_HEIGHT GetSystemMetrics(SM_CYSCREEN)
 
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 600
+#define WINDOW_WIDTH 1100
+#define WINDOW_HEIGHT 768
 
-#define PLATFORM_WIDTH 80
+#define PLATFORM_WIDTH 100
 #define PLATFORM_HEIGHT 13
 #define PLATFORM_SPEED 50
 
 #define BALL_WIDTH 10
 #define BALL_HEIGHT 10
+#define BALL_SPEED 30
 
-#define TILE_WIDTH WINDOW_WIDTH/12
+#define TILE_SPACINGX 8
+#define TILE_SPACINGY 10
+
+#define GRID_MARGINLR 50
+#define GRID_MARGINTB 90
+
+#define TILE_WIDTH (1080 - (GRID_MARGINLR<<1) - (TILE_SPACINGX*11))/12
+
 #define TILE_HEIGHT 18
- 
-static HWND hwnd;
+
+#pragma warning (disable: 26495)
+
+HWND hwnd;
 bool Running;
 RECT client;
 
-  
+
+#define PI 3.1415
+typedef struct PointF {
+    float x, y;
+};
+
 struct Entity {	
     COLORREF color;
 
@@ -37,7 +52,9 @@ struct Entity {
 
 void DrawRect(HDC hdc, RECT src, COLORREF color) {
     HBRUSH brush = CreateSolidBrush(color);
+
     HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, brush);
+    
     FillRect(hdc, &src, brush);
     ReleaseDC(NULL, hdc);
     SelectObject(hdc, oldBrush);
@@ -62,7 +79,7 @@ struct Platform : public Entity {
     } 
     void update() override {	    
 	GetClientRect(hwnd, &client);	    
-	if (GetAsyncKeyState(VK_LEFT) & 0x8000) {
+	if (GetAsyncKeyState(VK_LEFT) & 0x8000 || GetAsyncKeyState(0x41) & 0x8000) {
 	    if (this->pos.x <= client.left) {
 		OffsetRect(&this->src, 0, 0);
 		InvalidateRect(hwnd, NULL, TRUE);
@@ -71,7 +88,7 @@ struct Platform : public Entity {
 		OffsetRect(&this->src, -PLATFORM_SPEED, 0);
 		InvalidateRect(hwnd, NULL, TRUE);
 	    }
-	} else if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
+	} else if (GetAsyncKeyState(VK_RIGHT) & 0x8000 || GetAsyncKeyState(0x44) & 0x8000) {
 	    if (this->pos.x >= client.right-PLATFORM_WIDTH) {
 		OffsetRect(&this->src, 0, 0);
 		InvalidateRect(hwnd, NULL, TRUE);		    
@@ -86,7 +103,7 @@ struct Platform : public Entity {
 };
 
 Platform platform (0, 0, RGB(170, 0, 170));
-struct Tile : public Entity{
+struct Tile : public Entity {
     void draw() override {
 	HDC hdc = GetDC(hwnd);    
 	this->src.left = this->pos.x;
@@ -112,17 +129,21 @@ struct Grid {
 	int i, j;
 	COLORREF currentColor;
 	int iter = 0;
+	  
 	for (i = 0; i < 10; i++) {
 	    if(!(i&1)) {
 		currentColor = colors[iter];
 		++iter;
 	    }
 	    for (j = 0; j < 12; j++) {
-		grid[i][j]->pos.x = ox+(TILE_WIDTH+5)*j; 
-		grid[i][j]->pos.y = oy+(TILE_HEIGHT+10)*i;     
+		grid[i][j]->pos.x = GRID_MARGINLR+(TILE_WIDTH+TILE_SPACINGX)*j; 
+		grid[i][j]->pos.y = GRID_MARGINTB+(TILE_HEIGHT+TILE_SPACINGY)*i;     
 		grid[i][j]->color = currentColor;
 	    }
-	} 
+	    
+	}
+	
+	
    }
     void reset() {
 	
@@ -143,88 +164,86 @@ struct Grid {
 	}
 	delete[] grid;
     }
-private:
-    int oy = 60;
-    int ox = 2;
 };
       
 
 Grid _grid;
 
+
 struct Ball : public Entity {    
-    int dx, dy = 0;	
-    Ball(){};
-    Ball(int x, int y, COLORREF color) {
+    float dx, dy = 0;	
+    PointF pos;
+    
+    Ball(float x, float y, COLORREF color) {
 	this->pos.x = x;
 	this->pos.y = y;
 	this->color = color;
     }
     void draw() override {
 	HDC hdc = GetDC(hwnd);    
-	src.left = this->pos.x;
-	src.top = this->pos.y;
-	src.right = this->pos.x + BALL_WIDTH - 1;
-	src.bottom = this->pos.y + BALL_HEIGHT - 1;
+	src.left = (int)this->pos.x;
+	src.top = (int)this->pos.y;
+	src.right = (int)this->pos.x + BALL_WIDTH - 1;
+	src.bottom = (int)this->pos.y + BALL_HEIGHT - 1;
 	DrawRect(hdc, this->src, this->color);   
     }
     
     void update() override {
-	bool collision = onCollision();
-	if (this->pos.x <= 0 || this->pos.x >= client.right-BALL_WIDTH || collision) {
+	if (this->pos.x <= 0 || this->pos.x >= client.right-BALL_WIDTH) {
 	    this->dx *= -1;
 	}
-	if (this->pos.y <= 0 || collision) {
+	if (this->pos.y <= 0) {
 	    this->dy*=-1;
 	}
 	if (this->pos.y >= client.bottom - BALL_HEIGHT) {
 	    Running = false;
 	    return;
 	}
-  	
+	RECT dst;
+	
+	bool collision = IntersectRect(&dst, &this->src, &platform.src);
+	if (collision)
+	{
+	    float ballPos = (float)((platform.pos.x + PLATFORM_WIDTH/2) - (this->pos.x + BALL_WIDTH/2));
+	    
+	    float degrees = 60.0f * (ballPos / (float)(PLATFORM_WIDTH/2));
+            float radians = degrees * (PI / 180.0f);
+
+	    this->dx = (float)BALL_SPEED * sin(radians)*-1.f;
+            this->dy = (float)BALL_SPEED * cos(radians)*-1.f;
+	}
+	
+  	for (int i = 0; i < 10; i++) {
+	    for (int j = 0; j < 12; j++) {
+		if(_grid.grid[i][j]) {
+		    collision = IntersectRect(&dst, &this->src, &_grid.grid[i][j]->src);
+		    if (collision) {
+			this->dy*=-1; 
+			_grid.grid[i][j] = NULL;		    
+			break;
+		    }
+		}
+	    }	    
+	}	
 	this->pos.x += this->dx;
 	this->pos.y += this->dy;
 	OffsetRect(&this->src, this->pos.x*this->dx, this->pos.y*this->dy);
 	InvalidateRect(hwnd, NULL, TRUE);
     }
-private:
-    bool onCollision() {	    
-	if( 
-	this->pos.x < platform.pos.x + PLATFORM_WIDTH &&
-	this->pos.x + BALL_WIDTH > platform.pos.x &&
-	this->pos.y < platform.pos.y + PLATFORM_HEIGHT &&
-	this->pos.y + BALL_HEIGHT > platform.pos.y 
-	) return true;
-	
-	for (int i = 0; i < 10; i++) {
-	    for (int j = 0; j < 12; j++) {
-		if(_grid.grid[i][j]) {
-		    if (this->pos.x < _grid.grid[i][j]->pos.x + TILE_WIDTH &&
-		    this->pos.x + BALL_WIDTH > _grid.grid[i][j]->pos.x &&
-		    this->pos.y < _grid.grid[i][j]->pos.y + TILE_HEIGHT &&
-		    this->pos.y + BALL_HEIGHT > _grid.grid[i][j]->pos.y
-		    ) {
-			_grid.grid[i][j] = NULL;
-			return true;
-		    }
-		}
-	    }
-	}	
-	return false;
-    }
 };
 Ball ball (0, 0, RGB(255, 255, 255));
-  
-   
+
 void init(void) {
+    srand(time(0));
     ShowCursor(FALSE);
     Running = true; 
-    GetClientRect(hwnd, &client);
+    GetClientRect(hwnd, &client);    
     platform.pos.x = (client.right-client.left)/2 - PLATFORM_WIDTH/2;
-    platform.pos.y = (client.bottom-client.top)/2 - PLATFORM_HEIGHT/2 + 260;     
+    platform.pos.y = (client.bottom-client.top)/2 - PLATFORM_HEIGHT/2 + 340;     
     ball.pos.x = (client.right-client.left)/2 - BALL_WIDTH/2;
-    ball.pos.y = (client.bottom-client.top)/2 - BALL_HEIGHT/2 + 240;    
-    ball.dx = 25;
-    ball.dy = 25;    
+    ball.pos.y = (client.bottom-client.top)/2 - BALL_HEIGHT/2 + 320;    
+    ball.dx = (float)BALL_SPEED;
+    ball.dy = (float)BALL_SPEED;    
 }
 void draw() {
     _grid.draw();
@@ -302,7 +321,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     switch (msg)
     {
 	case WM_PAINT:
-	    {
+	    {		
 		HDC hdc;
 		PAINTSTRUCT  ps;
 		hdc = BeginPaint(hwnd, &ps);
