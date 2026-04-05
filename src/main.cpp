@@ -1,6 +1,7 @@
 ﻿#include <windows.h>
 #include <windowsx.h>
 #include <iostream>
+#include <random>
 
 #include "../header/resource.h"
 #include "../header/levels.h"
@@ -11,18 +12,20 @@
 #define WINDOW_WIDTH 1100
 #define WINDOW_HEIGHT 768
 
-#define PLATFORM_WIDTH 100
-#define PLATFORM_HEIGHT 13
+#define PLATFORM_WIDTH 90
+#define PLATFORM_HEIGHT 14
 #define PLATFORM_SPEED 50
 
-#define BALL_WIDTH 10
-#define BALL_HEIGHT 10
+#define BALL_WIDTH 12
+#define BALL_HEIGHT 12
+
 #define BALL_SPEED 30
+#define BALL_SPIN 0.8f
 
 #define TILE_SPACINGX 8
 #define TILE_SPACINGY 10
 
-#define GRID_MARGINLR 50
+#define GRID_MARGINLR 40
 #define GRID_MARGINTB 90
 
 #define TILE_WIDTH (1080 - (GRID_MARGINLR<<1) - (TILE_SPACINGX*11))/12
@@ -36,10 +39,17 @@ bool Running;
 RECT client;
 
 
-#define PI 3.1415
+#define PI 3.14159
+
 typedef struct PointF {
     float x, y;
 };
+
+float fRand(float fMin=0.f, float fMax=1.f)
+{
+    float f = (float)rand() / RAND_MAX;
+    return fMin + f * (fMax - fMin);
+}
 
 struct Entity {	
     COLORREF color;
@@ -139,12 +149,9 @@ struct Grid {
 		grid[i][j]->pos.x = GRID_MARGINLR+(TILE_WIDTH+TILE_SPACINGX)*j; 
 		grid[i][j]->pos.y = GRID_MARGINTB+(TILE_HEIGHT+TILE_SPACINGY)*i;     
 		grid[i][j]->color = currentColor;
-	    }
-	    
-	}
-	
-	
-   }
+	    }	    
+	} 	
+    }
     void reset() {
 	
     }
@@ -168,7 +175,7 @@ struct Grid {
       
 
 Grid _grid;
-
+RECT dst;
 
 struct Ball : public Entity {    
     float dx, dy = 0;	
@@ -189,36 +196,22 @@ struct Ball : public Entity {
     }
     
     void update() override {
-	if (this->pos.x <= 0 || this->pos.x >= client.right-BALL_WIDTH) {
-	    this->dx *= -1;
-	}
-	if (this->pos.y <= 0) {
-	    this->dy*=-1;
-	}
-	if (this->pos.y >= client.bottom - BALL_HEIGHT) {
-	    Running = false;
-	    return;
-	}
-	RECT dst;
-	
-	bool collision = IntersectRect(&dst, &this->src, &platform.src);
-	if (collision)
-	{
-	    float ballPos = (float)((platform.pos.x + PLATFORM_WIDTH/2) - (this->pos.x + BALL_WIDTH/2));
-	    
-	    float degrees = 60.0f * (ballPos / (float)(PLATFORM_WIDTH/2));
-            float radians = degrees * (PI / 180.0f);
 
-	    this->dx = (float)BALL_SPEED * sin(radians)*-1.f;
-            this->dy = (float)BALL_SPEED * cos(radians)*-1.f;
+	bool collision = IntersectRect(&dst, &this->src, &platform.src);
+
+	if (collision) {
+	    float angle = (float)(atan2(this->dy, this->dx));
+	    angle+=(fRand()*PI/2-PI/4)*BALL_SPIN;
+	    this->dx = BALL_SPEED*cos(angle);
+	    this->dy = -BALL_SPEED*sin(angle);	    
 	}
 	
   	for (int i = 0; i < 10; i++) {
 	    for (int j = 0; j < 12; j++) {
 		if(_grid.grid[i][j]) {
 		    collision = IntersectRect(&dst, &this->src, &_grid.grid[i][j]->src);
-		    if (collision) {
-			this->dy*=-1; 
+		    if (collision) {			    
+			this->dy*=-1;
 			_grid.grid[i][j] = NULL;		    
 			break;
 		    }
@@ -229,7 +222,7 @@ struct Ball : public Entity {
 	this->pos.y += this->dy;
 	OffsetRect(&this->src, this->pos.x*this->dx, this->pos.y*this->dy);
 	InvalidateRect(hwnd, NULL, TRUE);
-    }
+    } 
 };
 Ball ball (0, 0, RGB(255, 255, 255));
 
@@ -250,8 +243,22 @@ void draw() {
     platform.draw();
     ball.draw();
 }
+void check_walls() {
+    if (ball.pos.x <= 0 || ball.pos.x >= client.right-BALL_WIDTH) {
+	ball.dx *= -1;
+    }
+    if (ball.pos.y <= 0) {
+	ball.dy*=-1;
+    }
+    if (ball.pos.y >= client.bottom - BALL_HEIGHT) {
+	Running = false;
+	return;
+    }
+}
+
 void update() {
     platform.update();
+    check_walls();
     ball.update();
 }
 
@@ -294,7 +301,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
         return 0;
     }
     init();
-		
+   		
     ShowWindow(hwnd, nCmdShow);
     UpdateWindow(hwnd);
     
@@ -309,8 +316,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
             TranslateMessage(&Msg);
             DispatchMessageA(&Msg);
         } else {
-            update();
-	    draw();
+            draw();
+			update();
 	}
     }
     return Msg.wParam;
