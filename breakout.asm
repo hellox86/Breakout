@@ -1,52 +1,72 @@
 org 0x7C00
 bits 16
 
+%define OFFSET 0xA000
 %define WIDTH 320
 %define HEIGHT 200
+%define PADDLE_WIDTH 20
+%define PADDLE_HEIGHT 7
+%define PADDLE_COLOR 0x4F
 	
 start: 
 	;; video mode (320x200 VGA, 256 colors)
 	mov ax, 0x13
 	int 0x10
-	mov ax, 0xA000
+	mov ax, OFFSET
 	mov es, ax
-	;; one pixel
-	;; mov di, 320*100+160
-	;; mov byte [es:di], 0x0F
+
 	call draw_paddle
-	jmp .loop
+	jmp game_loop
 draw_paddle:
-	pusha
-	mov ax, 100
-	mov bx, 100
-	call draw_rect
-	popa
+	push ax
+	push bx
+	mov ax, 180
+	mov bx, 160
+	sub bx, PADDLE_WIDTH/2
+	mov cx, PADDLE_HEIGHT
+	call rowy
+	pop ax
+	pop bx
 	ret
-draw_rect:
+
+rowx:
+	;; ax - y, bx - x
 	pusha
 	mov dx, WIDTH
-	mul dx ;; result to ax
+	mul dx
 	add ax, bx
-	mov di, bx
+	mov di, ax
+	
+	mov al, PADDLE_COLOR
+	mov cx, PADDLE_WIDTH
+	rep stosb
 	popa
 	ret
-.loop:  
+rowy:
+	call rowx
+	inc ax
+	loop rowy
+game_loop:  
     hlt
     mov ah, 0x01
     int 0x16
-    jz .loop
+    jz game_loop
     xor al, al
     int 0x16
 
     cmp al, 0x1B
     jz exit_mode
-	
-    jmp .loop
-	
+    cmp al, 	
+    jmp game_loop
 	
 exit_mode:
 	mov ax, 0x0003
+
 	int 0x10	
+	cli
+	hlt
+
+em_msg:	db "Hello, from VGA text mode"
 
 times 510 - ($ - $$) db 0
 ;; Fills all free space from the current position to the 510th byte with zeros. for example my code file is 126b, then asm puts 510-126=384 zero bytes
