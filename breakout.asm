@@ -22,7 +22,13 @@ start:
 	int 0x10	
 	xor ax, ax
 	mov es, ax
-	mov ds, ax	
+	mov ds, ax
+
+	mov si, igame
+	mov di, game
+	mov cx, Game_size
+	cld
+	rep movsb
 	mov dword [0x0070], render
 	
 .loop:
@@ -36,43 +42,27 @@ start:
     
     cmp al, 0x1B
     jz exit_mode 
+
     cmp al, 'a'
     jz .left
+    cmp ah, 0x4B
+    jz .left
+
     cmp al, 'd'
     jz .right
+    cmp ah, 0x4D
+    jz .right
+    cmp al, 'r'
+    jz start
     jmp .loop
 
-.left:
-	pusha
-	mov ax, OFFSET
-	mov es, ax
-	
-	xor dl, dl
-	call draw_paddle
-	popa
-	
-	push ax
-	mov ax, [game + Game.padx]
-	sub ax, 10
-	mov [game + Game.padx], ax
-	pop ax
-	
-	jmp .loop
-.right:
-	pusha
-	mov ax, OFFSET
-	mov es, ax
-	
-	xor dl, dl
-	call draw_paddle
-	popa
 
-	push ax
-	mov ax, [game + Game.padx]
-	add ax, 10
-	mov [game + Game.padx], ax
-	pop ax
+.left:
+	sub word [game + Game.padx], 10
+	jmp .loop
 	
+.right:
+	add word [game + Game.padx], 10
 	jmp .loop
 
 draw_paddle:
@@ -83,6 +73,15 @@ draw_paddle:
 	call rowloop
 	ret
 
+clearbg:
+	pusha
+	mov ax, OFFSET
+	mov es, ax
+	mov di, ax
+	mov cx, WIDTH*HEIGHT
+	rep stosb
+	popa
+	ret
 rowx:
 	push ax
 	push bx
@@ -119,6 +118,7 @@ render:
 	mov ax, OFFSET
 	mov es, ax
 	mov dl, 0x4F
+	call clearbg
 	call draw_paddle
 	popa
 	iret
@@ -127,8 +127,7 @@ exit_mode:
 	mov ax, 0x0003
 	int 0x10	
 	hlt
-
-game:	
+igame:	
 istruc Game
 	at .padx, dw 160
 	at .pady, dw 180
@@ -138,13 +137,12 @@ istruc Game
 	at .dy, dw 0
 
 iend
+game:	
+	times 32 db 0
+	times 510 - ($ - $$) db 0
+	dw 0xAA55
 
-times 510 - ($ - $$) db 0
-;; Fills all free space from the current position to the 510th byte with zeros. for example my code file is 126b, then asm puts 510-126=384 zero bytes
-dw 0xAA55
 %if $ - $$ != 512
         %fatal Resulting size is not 512
 %endif
 	
-;; This magic number (signature) of the boot sector is a standard one, hardcoded into the BIOS of all x86-compatible computers:
-;; The BIOS reads the first sector of the disk (512 bytes) into memory at address 0x7C00 and checks the last 2 bytes of that sector (0xAA55).
