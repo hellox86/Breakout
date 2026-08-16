@@ -1,47 +1,37 @@
 org 0x7C00
 bits 16
 
-%define OFFSET 0xA000
-%define WIDTH 320
-%define HEIGHT 200
-%define PADDLE_WIDTH 20
-%define PADDLE_HEIGHT 7
-	
-struc Game
-	.padx resw 1
-	.pady resw 1
-	.ballx resw 1
-	.bally resw 1
-	.dx resw 1
-	.dy resw 1	
-endstruc
-	
+OFFSET EQU 0xA000
+WIDTH EQU 320
+HEIGHT EQU 200
+PADDLE_WIDTH EQU 20
+PADDLE_HEIGHT EQU 7
+
 start: 
-	;; video mode (320x200 VGA, 256 colors)		
 	mov ax, 0x13
 	int 0x10	
 	xor ax, ax
 	mov es, ax
 	mov ds, ax
 
-	mov si, igame
-	mov di, game
-	mov cx, Game_size
-	cld
-	rep movsb
-	mov dword [0x0070], render
+	mov word [padx], 160
+	mov word [pady], 180
+	mov word [ballx], 160
+	mov word [bally], 170
+
+	mov dword [0x0070], draw
 	
 .loop:
     mov ah, 0x01
     int 0x16
 
-    jz .loop
-    
+    jz .no_key
+	
     xor ah, ah
     int 0x16	
     
     cmp al, 0x1B
-    jz exit_mode 
+    jz exit
 
     cmp al, 'a'
     jz .left
@@ -53,32 +43,34 @@ start:
     cmp ah, 0x4D
     jz .right
     cmp al, 'r'
-    jz start
-    jmp .loop
+    jz restart
+    jmp .no_key
 
 
 .left:
-	sub word [game + Game.padx], 10
-	jmp .loop
+	mov word [pdx], -10
+	jmp .no_key
 	
 .right:
-	add word [game + Game.padx], 10
-	jmp .loop
+	mov word [pdx], 10	
+	jmp .no_key
+
+.no_key:
+	jmp .loop 
 
 draw_paddle:
-	mov ax, [game + Game.pady]
-	mov bx, [game + Game.padx]
-	sub bx, PADDLE_WIDTH/2
+	mov ax, [pady]
+	mov bx, [padx]
+	sub bx, PADDLE_WIDTH>>1
 	mov cx, PADDLE_HEIGHT
 	call rowloop
 	ret
-
-clearbg:
+clear_scr:
 	pusha
 	mov ax, OFFSET
 	mov es, ax
-	mov di, ax
-	mov cx, WIDTH*HEIGHT
+	xor di, di
+	mov cx, WIDTH * HEIGHT
 	rep stosb
 	popa
 	ret
@@ -113,36 +105,50 @@ rowloop:
 	loop rowloop
 	ret
 	
-render:
+
+update:
+	cmp word [padx], PADDLE_WIDTH>>1
+	jle .neg_pad
+	cmp word [padx], WIDTH - (PADDLE_WIDTH>>1)
+	jge .neg_pad
+
+.upad:
+	mov ax, [padx]
+	add ax, [pdx]
+	mov [padx], ax
+	ret
+	
+.neg_pad:
+	neg word [pdx]
+	jmp .upad 
+
+draw:
 	pusha
 	mov ax, OFFSET
 	mov es, ax
 	mov dl, 0x4F
-	call clearbg
+	call update
+	call clear_scr
 	call draw_paddle
 	popa
 	iret
 
-exit_mode:
+restart:
+	int 0x19
+	hlt
+exit:
 	mov ax, 0x0003
 	int 0x10	
 	hlt
-igame:	
-istruc Game
-	at .padx, dw 160
-	at .pady, dw 180
-	at .ballx, dw 160
-	at .bally, dw 170 
-	at .dx, dw 0
-	at .dy, dw 0
 
-iend
-game:	
-	times 32 db 0
-	times 510 - ($ - $$) db 0
-	dw 0xAA55
+padx   dw 0
+pady   dw 0
+pdx    dw 0
+ballx  dw 0
+bally  dw 0 
+bdx    dw 0
+bdy    dw 0
 
-%if $ - $$ != 512
-        %fatal Resulting size is not 512
-%endif
+times 510 - ($ - $$) db 0
+dw 0xAA55
 	

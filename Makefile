@@ -1,3 +1,3 @@
 all:
-	nasm breakout.asm -o breakout
-	qemu-system-i386 breakout
+	nasm -f bin breakout.asm -o breakout.bin
+	qemu-system-i386 breakout.bin
