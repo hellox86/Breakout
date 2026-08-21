@@ -1,2 +1,4 @@
 text.asm
 breakout
+*.bin
+*.img
