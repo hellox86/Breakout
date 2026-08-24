@@ -23,7 +23,7 @@ start:
 	mov word [bally], 174
 	mov word [bdx], 4
 	mov word [bdy], 4
-	mov word [state], 0
+	mov byte [state], 1
 	mov dword [0x0070], draw
 	
 .loop:
@@ -40,7 +40,7 @@ start:
     jz .right
 
     cmp al, 0x13
-    jz restart
+    jz restart	
     jmp .loop
 
 
@@ -138,15 +138,15 @@ bounce:
 	ret
 	
 update:
-	cmp word [ballx], 0
-	jbe .neg_ballx
+	cmp word [ballx], BALL_RADIUS
+	jle .neg_ballx
 	cmp word [ballx], WIDTH - (BALL_RADIUS)
-	jae .neg_ballx	
+	jge .neg_ballx	
 
 	cmp word [bally], 0
-	jbe .neg_bally
+	jle .neg_bally
 	cmp word [bally], HEIGHT - (BALL_RADIUS)
-	jae .game_over
+	jge .game_over
 	call col
 	
 .uball:
@@ -166,17 +166,17 @@ update:
 	neg word [bdy]
 	jmp .uball
 .game_over:
-	mov byte [state], 1
+	neg byte [state]
 	xor ax, ax
 	mov es, ax
-	mov ah, 0x13
+	mov ax, 0x1301
+	
 	mov bx, 0x0F
 	mov cx, game_over_sign_len
 	;(COLS, ROWS)
 	mov dx, 0x0C10
 	mov bp, game_over_sign
 	int 0x10
-
 .end:
 	ret
 
@@ -203,11 +203,9 @@ col:
 	ret
 
 draw:
-	mov ax, [state]
-	test ax, ax
+	cmp byte [state], 1
 	jz .d
-	jmp .e
-	
+	jmp .e	
 .d:
 	pusha
 	mov ax, OFFSET
