@@ -4,31 +4,33 @@ bits 16
 OFFSET EQU 0xA000
 WIDTH EQU 320
 HEIGHT EQU 200
-PADDLE_WIDTH EQU 16
-PADDLE_HEIGHT EQU 7
+PADDLE_WIDTH EQU 4
+PADDLE_HEIGHT EQU 16
 BALL_RADIUS EQU 4
 COLUMNS EQU 40
 ROWS EQU 25
 
-start: 
+start:
 	mov ax, 0x13
 	int 0x10	
 	xor ax, ax
 	mov es, ax
 	mov ds, ax
 	
-	mov word [padx], 160
-	mov word [pady], 180
+	mov word [padx], 10
+	mov word [pady], 103
 	mov word [ballx], 160
 	mov word [bally], 174
-	mov word [bdx], 4
-	mov word [bdy], 4
+	mov word [bdx], 6
+	mov word [bdy], 6
 	mov byte [state], 1
 	mov dword [0x0070], draw
 	
 .loop:
     hlt
     in al, 0x60
+    cmp al, 0x13
+    jz start	
     cmp al, 0x1E
     jz .left
     cmp al, 0x4B
@@ -38,11 +40,7 @@ start:
     jz .right
     cmp al, 0x4D
     jz .right
-
-    cmp al, 0x13
-    jz restart	
     jmp .loop
-
 
 .left:
 	cmp word [padx], PADDLE_WIDTH
@@ -64,10 +62,8 @@ start:
 draw_paddle:
 	mov ax, [pady]
 	mov bx, [padx]
-	sub bx, PADDLE_WIDTH>>1
-	mov cx, PADDLE_HEIGHT
-	mov dh, PADDLE_WIDTH
-	call rowloop
+	mov cx, PADDLE_WIDTH
+	call verlt
 	ret
 draw_ball:
 	mov ax, [bally]
@@ -91,7 +87,8 @@ clear_scr:
 	rep stosb
 	popa
 	ret
-rowx:
+	
+horl:
 	push ax
 	push bx
 	push di
@@ -115,16 +112,46 @@ rowx:
 	pop bx
 	pop ax
 	ret
-
+	
+p:				
+	push ax
+	push bx
+	push di
+	push dx
+	mov dx, WIDTH
+	mul dx
+	pop dx
+	
+	add ax, bx
+	mov di, ax
+	mov al, dl
+        stosb
+	pop di
+	pop bx
+	pop ax
+	ret
+verl:
+	call p
+	inc ax
+	loop verl
+	ret
+verlt:
+	push ax
+	push cx
+	mov cx, PADDLE_HEIGHT
+	call verl
+	pop cx
+	pop ax
+	inc bx
+	loop verlt
+	ret
 rowloop:
 	push cx
-	call rowx
+	call horl
 	pop cx
-	inc ax
 	loop rowloop
 	ret
 	
-;; old hack
 bounce:
 	mov ax, [ballx]
 	sub ax, PADDLE_WIDTH>>1
@@ -136,7 +163,7 @@ bounce:
 	add ax, [bdx]
 	neg word [bdy]
 	ret
-	
+
 update:
 	cmp word [ballx], BALL_RADIUS
 	jle .neg_ballx
@@ -146,8 +173,8 @@ update:
 	cmp word [bally], 0
 	jle .neg_bally
 	cmp word [bally], HEIGHT - (BALL_RADIUS)
-	jge .game_over
-	call col
+	jge .neg_bally
+	;; call col
 	
 .uball:
 	mov ax, [ballx]
@@ -177,11 +204,11 @@ update:
 	mov dx, 0x0C10
 	mov bp, game_over_sign
 	int 0x10
+	
 .end:
 	ret
 
 col:
-	;; optimized collision 
 	mov ax, [ballx]
 	sub ax, [padx]
 	cmp ax, PADDLE_WIDTH + BALL_RADIUS
@@ -195,9 +222,7 @@ col:
 	ja .end
 	add ax, BALL_RADIUS
 	jbe .end
-	jmp .hand
 	
-.hand:
 	call bounce
 .end:
 	ret
@@ -212,19 +237,11 @@ draw:
 	mov es, ax
 	call clear_scr
 	call update
-	mov dl, 0x4F
+	mov dl, 0x0F
 	call draw_paddle
-	
-	mov dl, 0xC
-	call draw_ball
-	
 	popa
 .e:
 	iret
-
-restart:
-	int 0x19
-	hlt
 padx   dw 0
 pady   dw 0
 pdx    dw 0
