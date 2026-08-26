@@ -5,7 +5,7 @@ OFFSET EQU 0xA000
 WIDTH EQU 320
 HEIGHT EQU 200
 PADDLE_WIDTH EQU 4
-PADDLE_HEIGHT EQU 16
+PADDLE_HEIGHT EQU 32
 BALL_RADIUS EQU 4
 COLUMNS EQU 40
 ROWS EQU 25
@@ -17,13 +17,13 @@ start:
 	mov es, ax
 	mov ds, ax
 	
-	mov word [padx], 10
-	mov word [pady], 103
+	mov word [pl1x], 10
+	mov word [pl1y], 103
 	mov word [ballx], 160
 	mov word [bally], 174
 	mov word [bdx], 6
 	mov word [bdy], 6
-	mov byte [state], 1
+	mov byte [state], 1	
 	mov dword [0x0070], draw
 	
 .loop:
@@ -31,52 +31,60 @@ start:
     in al, 0x60
     cmp al, 0x13
     jz start	
-    cmp al, 0x1E
-    jz .left
-    cmp al, 0x4B
-    jz .left
+    cmp al, 0x48
+    jz .down
+    cmp al, 0x11
+    jz .down
 
-    cmp al, 0x20
-    jz .right
-    cmp al, 0x4D
-    jz .right
+    cmp al, 0x50
+    jz .up
+    cmp al, 0x1F
+    jz .up
     jmp .loop
 
-.left:
-	cmp word [padx], PADDLE_WIDTH
-	jbe .false
-	mov word [pdx], -10
+.down:
+	cmp word [pl1y], 12
+	jle .false
+	
+	mov word [pdy], -10
 	call upad
 	jmp .loop
-.right:
-	cmp word [padx], WIDTH-PADDLE_WIDTH
-	jae .false
-	mov word [pdx], 10
+.up:
+	cmp word [pl1y], HEIGHT-40
+	jge .false
+
+	mov word [pdy], 10
 	call upad	
 	jmp .loop
 .false:
-	mov word [pdx], 0
+	mov word [pdy], 0
 	call upad
 	jmp .loop
 
 draw_paddle:
-	mov ax, [pady]
-	mov bx, [padx]
+	mov ax, [pl1y]
+	mov bx, [pl1x]
 	mov cx, PADDLE_WIDTH
 	call verlt
 	ret
+	
 draw_ball:
 	mov ax, [bally]
 	mov bx, [ballx]
-	sub bx, BALL_RADIUS>>1
 	mov cx, BALL_RADIUS
 	mov dh, BALL_RADIUS
 	call rowloop
 	ret
+draw_sep:
+	xor ax, ax
+	mov bx, 160
+	mov cx, 50
+	call verl2
+	ret
 upad:
-	mov ax, [padx]
-	add ax, [pdx]
-	mov [padx], ax
+	mov ax, [pl1y]
+	add ax, [pdy]
+	mov [pl1y], ax
 	ret
 clear_scr:
 	pusha
@@ -135,6 +143,12 @@ verl:
 	inc ax
 	loop verl
 	ret
+verl2:
+	call p
+	add ax, 4
+	loop verl2
+	ret
+	
 verlt:
 	push ax
 	push cx
@@ -149,6 +163,7 @@ rowloop:
 	push cx
 	call horl
 	pop cx
+	inc ax
 	loop rowloop
 	ret
 	
@@ -174,7 +189,7 @@ update:
 	jle .neg_bally
 	cmp word [bally], HEIGHT - (BALL_RADIUS)
 	jge .neg_bally
-	;; call col
+	call col
 	
 .uball:
 	mov ax, [ballx]
@@ -210,14 +225,14 @@ update:
 
 col:
 	mov ax, [ballx]
-	sub ax, [padx]
+	sub ax, [pl1x]
 	cmp ax, PADDLE_WIDTH + BALL_RADIUS
 	ja .end
 	add ax, BALL_RADIUS
 	jbe .end
 
 	mov ax, [bally]
-	sub ax, [pady]
+	sub ax, [pl1y]
 	cmp ax, PADDLE_HEIGHT + BALL_RADIUS
 	ja .end
 	add ax, BALL_RADIUS
@@ -239,12 +254,15 @@ draw:
 	call update
 	mov dl, 0x0F
 	call draw_paddle
+	call draw_ball
+	call draw_sep
+
 	popa
 .e:
 	iret
-padx   dw 0
-pady   dw 0
-pdx    dw 0
+pl1x   dw 0
+pl1y   dw 0
+pdy    dw 0
 ballx  dw 0
 bally  dw 0 
 bdx    dw 0
