@@ -17,13 +17,16 @@ start:
 	mov es, ax
 	mov ds, ax
 	
-	mov word [pl1x], 10
-	mov word [pl1y], 103
+	mov word [p1x], 10
+	mov word [p1y], 103
+
+	mov word [p2x], 310
+	mov word [p2y], 103
+	
 	mov word [ballx], 160
-	mov word [bally], 174
-	mov word [bdx], 6
-	mov word [bdy], 6
-	mov byte [state], 1	
+	mov word [bally], 100
+	mov word [bdx], -6
+	mov word [bdy], 0
 	mov dword [0x0070], draw
 	
 .loop:
@@ -43,14 +46,14 @@ start:
     jmp .loop
 
 .down:
-	cmp word [pl1y], 12
+	cmp word [p1y], 12
 	jle .false
 	
 	mov word [pdy], -10
 	call upad
 	jmp .loop
 .up:
-	cmp word [pl1y], HEIGHT-40
+	cmp word [p1y], HEIGHT-40
 	jge .false
 
 	mov word [pdy], 10
@@ -62,12 +65,12 @@ start:
 	jmp .loop
 
 draw_paddle:
-	mov ax, [pl1y]
-	mov bx, [pl1x]
+	mov ax, [p1y]
+	mov bx, [p1x]
 	mov cx, PADDLE_WIDTH
 	call verlt
 	ret
-	
+
 draw_ball:
 	mov ax, [bally]
 	mov bx, [ballx]
@@ -82,10 +85,11 @@ draw_sep:
 	call verl2
 	ret
 upad:
-	mov ax, [pl1y]
+	mov ax, [p1y]
 	add ax, [pdy]
-	mov [pl1y], ax
+	mov [p1y], ax
 	ret
+
 clear_scr:
 	pusha
 	mov ax, OFFSET
@@ -170,26 +174,23 @@ rowloop:
 bounce:
 	mov ax, [ballx]
 	sub ax, PADDLE_WIDTH>>1
-	test ax, ax
-	jae .div
-	add ax, 3
-.div:
-	sar ax, 2
+	sar ax, 3
 	add ax, [bdx]
-	neg word [bdy]
+	neg word [bdx]
 	ret
 
 update:
 	cmp word [ballx], BALL_RADIUS
-	jle .neg_ballx
+	jle .goal
 	cmp word [ballx], WIDTH - (BALL_RADIUS)
-	jge .neg_ballx	
+	jge .goal	
 
 	cmp word [bally], 0
 	jle .neg_bally
 	cmp word [bally], HEIGHT - (BALL_RADIUS)
 	jge .neg_bally
-	call col
+	call colp1
+	
 	
 .uball:
 	mov ax, [ballx]
@@ -201,52 +202,41 @@ update:
 	add ax, [bdy]
 	mov [bally], ax
 	jmp .end
-.neg_ballx:
-	neg word [bdx]
-	jmp .uball
 .neg_bally:
 	neg word [bdy]
-	jmp .uball
-.game_over:
-	neg byte [state]
-	xor ax, ax
-	mov es, ax
-	mov ax, 0x1301
-	
-	mov bx, 0x0F
-	mov cx, game_over_sign_len
-	;(COLS, ROWS)
-	mov dx, 0x0C10
-	mov bp, game_over_sign
-	int 0x10
-	
+	jmp .end
+.goal:
+	mov word [ballx], 160
+	mov word [bally], 100
+	neg word [bdx]
+
 .end:
 	ret
 
-col:
+colp1:
+	mov ax, [p1x]
+	add ax, PADDLE_WIDTH
+	cmp word [ballx], ax
+	jg .end
 	mov ax, [ballx]
-	sub ax, [pl1x]
-	cmp ax, PADDLE_WIDTH + BALL_RADIUS
-	ja .end
 	add ax, BALL_RADIUS
-	jbe .end
+	cmp ax, [p1x]
+	jl .end
+
+	mov ax, [p1y]
+	add ax, PADDLE_HEIGHT
+	cmp word [bally], ax
+	jg .end
 
 	mov ax, [bally]
-	sub ax, [pl1y]
-	cmp ax, PADDLE_HEIGHT + BALL_RADIUS
-	ja .end
 	add ax, BALL_RADIUS
-	jbe .end
-	
+	cmp ax, [p1y]
+	jl .end
 	call bounce
 .end:
 	ret
 
 draw:
-	cmp byte [state], 1
-	jz .d
-	jmp .e	
-.d:
 	pusha
 	mov ax, OFFSET
 	mov es, ax
@@ -256,18 +246,17 @@ draw:
 	call draw_paddle
 	call draw_ball
 	call draw_sep
-
 	popa
-.e:
 	iret
-pl1x   dw 0
-pl1y   dw 0
+p1x   dw 0
+p1y   dw 0
+p2x   dw 0
+p2y   dw 0
 pdy    dw 0
 ballx  dw 0
 bally  dw 0 
 bdx    dw 0
 bdy    dw 0
-state db 0
 game_over_sign: db "Game Over"
 game_over_sign_len equ $ - game_over_sign
 	
