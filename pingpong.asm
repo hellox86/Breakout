@@ -1,6 +1,6 @@
-org 0x7C00
+org 0x7E00
 bits 16
-
+	
 OFFSET EQU 0xA000
 WIDTH EQU 320
 HEIGHT EQU 200
@@ -31,32 +31,33 @@ start:
 	
 .loop:
     hlt
-    in al, 0x60
+    in al, 0x60	
     cmp al, 0x13
-    jz start	
+
+    jz start
     cmp al, 0x48
-    jz .down
+    jz .up
     cmp al, 0x11
-    jz .down
+    jz .up
 
     cmp al, 0x50
-    jz .up
+    jz .down
     cmp al, 0x1F
-    jz .up
+    jz .down
     jmp .loop
 
 .down:
-	cmp word [p1y], 12
-	jle .false
+	cmp word [p1y], HEIGHT-PADDLE_HEIGHT
+	jge .false
 	
-	mov word [pdy], -10
+	mov word [pdy], 10
 	call upad
 	jmp .loop
 .up:
-	cmp word [p1y], HEIGHT-40
-	jge .false
+	cmp word [p1y], 4
+	jle .false
 
-	mov word [pdy], 10
+	mov word [pdy], -10
 	call upad	
 	jmp .loop
 .false:
@@ -189,8 +190,7 @@ update:
 	jle .neg_bally
 	cmp word [bally], HEIGHT - (BALL_RADIUS)
 	jge .neg_bally
-	call colp1
-	
+	call colp1	
 	
 .uball:
 	mov ax, [ballx]
@@ -257,9 +257,7 @@ ballx  dw 0
 bally  dw 0 
 bdx    dw 0
 bdy    dw 0
+lastkey db 0
 game_over_sign: db "Game Over"
 game_over_sign_len equ $ - game_over_sign
-	
-times 510 - ($ - $$) db 0
-dw 0xAA55
-	
+
