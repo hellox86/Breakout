@@ -25,8 +25,8 @@ start:
 	
 	mov word [ballx], 160
 	mov word [bally], 100
-	mov word [bdx], -6
-	mov word [bdy], 0
+	mov word [bdx], 6
+	mov word [bdy], 6
 	mov dword [0x0070], draw
 	
 .loop:
@@ -65,9 +65,15 @@ start:
 	call upad
 	jmp .loop
 
-draw_paddle:
+draw_p1:
 	mov ax, [p1y]
 	mov bx, [p1x]
+	mov cx, PADDLE_WIDTH
+	call verlt
+	ret
+draw_p2:
+	mov ax, [p2y]
+	mov bx, [p2x]
 	mov cx, PADDLE_WIDTH
 	call verlt
 	ret
@@ -173,13 +179,8 @@ rowloop:
 	ret
 	
 bounce:
-	mov ax, [ballx]
-	sub ax, PADDLE_WIDTH>>1
-	sar ax, 3
-	add ax, [bdx]
-	neg word [bdx]
+	
 	ret
-
 update:
 	cmp word [ballx], BALL_RADIUS
 	jle .goal
@@ -191,6 +192,7 @@ update:
 	cmp word [bally], HEIGHT - (BALL_RADIUS)
 	jge .neg_bally
 	call colp1	
+	call colp2
 	
 .uball:
 	mov ax, [ballx]
@@ -204,12 +206,10 @@ update:
 	jmp .end
 .neg_bally:
 	neg word [bdy]
-	jmp .end
+	jmp .uball
 .goal:
-	mov word [ballx], 160
-	mov word [bally], 100
 	neg word [bdx]
-
+	jmp .uball
 .end:
 	ret
 
@@ -236,6 +236,47 @@ colp1:
 .end:
 	ret
 
+colp2:
+	mov ax, [p2x]
+	add ax, PADDLE_WIDTH
+	cmp word [ballx], ax
+	jg .end
+	mov ax, [ballx]
+	add ax, BALL_RADIUS
+	cmp ax, [p2x]
+	jl .end
+
+	mov ax, [p2y]
+	add ax, PADDLE_HEIGHT
+	cmp word [bally], ax
+	jg .end
+
+	mov ax, [bally]
+	add ax, BALL_RADIUS
+	cmp ax, [p2y]
+	jl .end
+	;; call bounce2
+.end:
+	ret
+
+ai:
+	;; https://github.com/kfigiela/asm-pong/blob/master/pong.asm thanks
+	pusha
+	cmp word[bdx], 0
+	jl .e
+	mov ax, [bally]            
+	mov bx, [p2y]           
+	sub ax, 16          
+	sub ax, bx             
+	mov bl, 10
+	mov dx, ax
+	sar dx, 5              
+	sar ax, 3              
+	sub ax, dx             
+	add word [p2y], ax   
+.e:
+	popa
+	ret
 draw:
 	pusha
 	mov ax, OFFSET
@@ -243,7 +284,9 @@ draw:
 	call clear_scr
 	call update
 	mov dl, 0x0F
-	call draw_paddle
+	call ai
+	call draw_p1
+	call draw_p2
 	call draw_ball
 	call draw_sep
 	popa
@@ -253,6 +296,7 @@ p1y   dw 0
 p2x   dw 0
 p2y   dw 0
 pdy    dw 0
+p2dy dw 0	
 ballx  dw 0
 bally  dw 0 
 bdx    dw 0
