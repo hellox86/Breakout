@@ -58,7 +58,7 @@ start:
 	jle .false
 
 	mov word [pdy], -10
-	call upad	
+	call upad
 	jmp .loop
 .false:
 	mov word [pdy], 0
@@ -91,6 +91,38 @@ draw_sep:
 	mov cx, 50
 	call verl2
 	ret
+draw_scr1:
+	;; teletype
+	mov ah, 0x02        
+	xor bh, bh           
+	mov dh, 2         
+	mov dl, 8          
+	int 0x10
+	
+	mov ah, 0x0E
+	mov dl, byte [scr1]
+	add dl, '0'
+	mov al, dl
+	
+	int 0x10
+        ret
+
+draw_scr2:
+	;; teletype
+	mov ah, 0x02        
+	xor bh, bh           
+	mov dh, 2         
+	mov dl, 30        
+	int 0x10
+	
+	mov ah, 0x0E
+	mov dl, byte [scr2]
+	add dl, '0'
+	mov al, dl
+	
+	int 0x10
+        ret
+
 upad:
 	mov ax, [p1y]
 	add ax, [pdy]
@@ -179,13 +211,25 @@ rowloop:
 	ret
 	
 bounce:
-	
+	mov ax, [bally]
+	sub ax, [p1y]
+	sar ax, 2
+	mov word [bdy], ax
+	neg word [bdx]
 	ret
+bounce2:
+	mov ax, [bally]
+	sub ax, [p2y]
+	sar ax, 2
+	mov word [bdy], ax
+	neg word [bdx]
+	ret
+
 update:
 	cmp word [ballx], BALL_RADIUS
-	jle .goal
+	jle .p1
 	cmp word [ballx], WIDTH - (BALL_RADIUS)
-	jge .goal	
+	jge .p2	
 
 	cmp word [bally], 0
 	jle .neg_bally
@@ -193,7 +237,7 @@ update:
 	jge .neg_bally
 	call colp1	
 	call colp2
-	
+
 .uball:
 	mov ax, [ballx]
 	add ax, [bdx]
@@ -207,9 +251,18 @@ update:
 .neg_bally:
 	neg word [bdy]
 	jmp .uball
-.goal:
+.p1:
+	inc byte [scr2]
+	mov word [ballx], 160
+	mov word [bally], 100
 	neg word [bdx]
-	jmp .uball
+	jmp .end
+.p2:
+	inc byte [scr1]
+	mov word [ballx], 160
+	mov word [bally], 100
+	neg word [bdx]
+	jmp .end
 .end:
 	ret
 
@@ -255,7 +308,7 @@ colp2:
 	add ax, BALL_RADIUS
 	cmp ax, [p2y]
 	jl .end
-	;; call bounce2
+	call bounce2
 .end:
 	ret
 
@@ -273,7 +326,7 @@ ai:
 	sar dx, 5              
 	sar ax, 3              
 	sub ax, dx             
-	add word [p2y], ax   
+	add word [p2y], ax	
 .e:
 	popa
 	ret
@@ -289,6 +342,8 @@ draw:
 	call draw_p2
 	call draw_ball
 	call draw_sep
+	call draw_scr1
+	call draw_scr2
 	popa
 	iret
 p1x   dw 0
@@ -302,6 +357,6 @@ bally  dw 0
 bdx    dw 0
 bdy    dw 0
 lastkey db 0
-game_over_sign: db "Game Over"
-game_over_sign_len equ $ - game_over_sign
-
+scr1 db 0
+scr2 db 0
+	
