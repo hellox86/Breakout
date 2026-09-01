@@ -27,6 +27,9 @@ start:
 	mov word [bally], 100
 	mov word [bdx], 6
 	mov word [bdy], 6
+	mov byte [scr1], 0
+	mov byte [scr2], 0
+	
 	mov dword [0x0070], draw
 	
 .loop:
@@ -331,6 +334,10 @@ ai:
 	popa
 	ret
 draw:
+	cmp byte [scr1], 9
+	jz .game_over
+	cmp byte [scr2], 9
+	jz .win
 	pusha
 	mov ax, OFFSET
 	mov es, ax
@@ -345,6 +352,36 @@ draw:
 	call draw_scr1
 	call draw_scr2
 	popa
+	jmp .e
+.game_over:
+	pusha
+	xor ax, ax
+	mov es, ax
+	mov ax, 0x1301
+	
+	mov bx, 0x0F
+	mov cx, game_over_sign_len
+		
+	mov dx, 0x0C10
+	mov bp, game_over_sign
+	int 0x10
+	popa
+	jmp .e
+
+.win:
+	pusha
+	xor ax, ax
+	mov es, ax
+	mov ax, 0x1301
+	
+	mov bx, 0x0F
+	mov cx, win_sign_len
+	
+	mov dx, 0x0C10
+	mov bp, win_sign
+	int 0x10
+	popa
+.e:
 	iret
 p1x   dw 0
 p1y   dw 0
@@ -359,4 +396,9 @@ bdy    dw 0
 lastkey db 0
 scr1 db 0
 scr2 db 0
+	
+game_over_sign: db "Game Over"
+game_over_sign_len equ $ - game_over_sign
+win_sign: db "You win!"
+win_sign_len equ $ - game_over_sign
 	
